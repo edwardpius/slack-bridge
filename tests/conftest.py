@@ -171,6 +171,9 @@ class FakeA2A:
                               "headers": dict(request.headers)})
         if auth.removeprefix("Bearer ") not in self.valid_tokens:
             return httpx.Response(401, text="unauthorized")
+        if request.headers.get("a2a-version") != "1.0":            # kagent 1.0 serves 1.0 only
+            return httpx.Response(200, json={"jsonrpc": "2.0", "id": body["id"], "error": {
+                "code": -32009, "message": "this version is not supported"}})
         if self.status_code != 200:
             return httpx.Response(self.status_code, text="nope")
         if body["method"] == "CancelTask":

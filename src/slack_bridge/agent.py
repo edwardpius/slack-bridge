@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Awaitable, Callable, Mapping
 
 import httpx
+from a2a.utils.constants import PROTOCOL_VERSION_CURRENT, VERSION_HEADER
 from a2a.client.errors import A2AClientError
 from a2a.client.transports.jsonrpc import JsonRpcTransport
 from a2a.types import a2a_pb2 as pb
@@ -53,7 +54,10 @@ class AgentClient:
         self._transport = transport
 
     def _http(self, id_token: str, extra_headers: Mapping[str, str] | None) -> httpx.AsyncClient:
-        headers = {"Authorization": f"Bearer {id_token}", **(extra_headers or {})}
+        # The SDK's ClientFactory sets A2A-Version; building the transport directly doesn't,
+        # and kagent then assumes 0.3 and refuses the call (found live, 2026-11-19).
+        headers = {"Authorization": f"Bearer {id_token}",
+                   VERSION_HEADER: PROTOCOL_VERSION_CURRENT, **(extra_headers or {})}
         timeout = httpx.Timeout(connect=10.0, read=self.run_timeout_s + 30, write=30.0, pool=10.0)
         return httpx.AsyncClient(headers=headers, timeout=timeout, transport=self._transport)
 

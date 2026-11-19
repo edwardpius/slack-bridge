@@ -96,7 +96,13 @@ class Bridge:
 
     async def handle(self, event: dict, kind: str, team: str) -> None:
         """Entry point for `app_mention` (kind="mention") and DM `message` (kind="dm")."""
-        if not self.accepts(event, kind) or not self._first_time(event):
+        if not self.accepts(event, kind):
+            # A real mention the bridge won't answer (channel not allowed, a bot, an edit):
+            # say so, or a wrong ALLOWED_CHANNELS looks like Slack sending nothing.
+            if kind == "mention":
+                log.info("event kind=mention ignored channel=%s", event.get("channel"))
+            return
+        if not self._first_time(event):
             return
         task = asyncio.create_task(self._handle(event, kind, team))
         self._tasks.add(task)

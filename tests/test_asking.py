@@ -219,3 +219,10 @@ async def test_help_for_empty_mention(world):
     assert "research question" in world.slack.of("ephemeral")[-1][3]
     assert world.a2a.requests == []
     assert REPORT  # fixture import used
+
+
+async def test_req13_ignored_mention_is_logged_without_text(world, caplog):
+    caplog.set_level(logging.INFO, logger="slack_bridge")
+    await world.say("secret question text", channel="C0OTHER")
+    assert "kind=mention ignored channel=C0OTHER" in caplog.text
+    assert "secret question text" not in caplog.text

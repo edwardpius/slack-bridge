@@ -1,0 +1,35 @@
+[project]
+name = "slack-bridge"
+version = "0.1.0"
+description = "Ask research-agent from Slack as your own hub user (Edward's AI Hub, spec H-006)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "a2a-sdk>=1.3,<2",
+    "aiohttp>=3.11",
+    "httpx>=0.28.1",
+    "slack-bolt>=1.23,<2",
+    "slack-sdk>=3.35,<4",
+    "opentelemetry-sdk>=1.38,<2",
+    "opentelemetry-exporter-otlp-proto-http>=1.38,<2",
+]
+
+[project.scripts]
+slack-bridge = "slack_bridge.app:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.24"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/slack_bridge"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["live: touches a real Slack workspace or the hub (ask first)"]
+addopts = "-m 'not live'"

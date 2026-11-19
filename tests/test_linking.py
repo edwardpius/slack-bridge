@@ -138,3 +138,12 @@ async def test_links_reject_path_like_ids(world):
     with pytest.raises(LinkStoreError):
         await world.links.get("t0team", USER)
     assert CHANNEL  # keep import used
+
+
+async def test_req01_private_replies_are_top_level_unless_the_user_wrote_in_a_thread(world):
+    """Slack shows no reply count for an ephemeral thread reply, so one under a top-level
+    message goes unseen (found on the first live DM, 2026-11-19)."""
+    await world.say("hi", channel="D0ALICE", kind="dm")
+    await world.say("hi")
+    await world.say("hi", thread_ts="1700000000.000009")
+    assert [c[4] for c in world.slack.of("ephemeral")] == [None, None, "1700000000.000009"]

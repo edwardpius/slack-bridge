@@ -125,29 +125,33 @@ class Bridge:
                 except Exception:                               # noqa: BLE001
                     log.exception("could not report the error ref=%s", ref)
             otel.set_attr(sp, "bridge.outcome", outcome)
+        log.info("event kind=%s outcome=%s ref=%s", kind, outcome, ref)
 
     async def _dispatch(self, team: str, user: str, channel: str, thread_ts: str,
                         event: dict, text: str, ref: str) -> str:
+        # Private replies go in a thread only if the user wrote in one: Slack shows no
+        # reply count for them, so a private reply under a top-level message goes unseen.
+        eph = event.get("thread_ts")
         if text.lower() == "disconnect":
-            await self.disconnect(team, user, channel, thread_ts)
+            await self.disconnect(team, user, channel, eph)
             return "disconnect"
         link = await self.links.get(team, user)
         if link is None:                                        # REQ-01
-            await self._offer_link(team, user, channel, thread_ts)
+            await self._offer_link(team, user, channel, eph)
             return "link_offered"
         if not text or text.lower() == "help":
-            await self.slack.post_ephemeral(channel, user, HELP, thread_ts=thread_ts)
+            await self.slack.post_ephemeral(channel, user, HELP, thread_ts=eph)
             return "help"
         if (team, user) in self._running:                       # REQ-12
             await self.slack.post_ephemeral(
                 channel, user, "You already have a research run in progress. "
-                "I'll take the next question when it finishes.", thread_ts=thread_ts)
+                "I'll take the next question when it finishes.", thread_ts=eph)
             return "busy"
         day = (team, user, self._today())
         if self._runs_today.get(day, 0) >= self.s.runs_per_day:
             await self.slack.post_ephemeral(
                 channel, user, f"You've reached today's limit of {self.s.runs_per_day} "
-                "research runs. You can still use the kagent UI.", thread_ts=thread_ts)
+                "research runs. You can still use the kagent UI.", thread_ts=eph)
             return "daily_limit"
         self._running.add((team, user))
         self._runs_today[day] = self._runs_today.get(day, 0) + 1
@@ -173,7 +177,7 @@ class Bridge:
             await self.links.delete(team, user)
             await self.slack.update(channel, status_ts,
                                     "Your hub link has expired. I've sent you a new sign-in link.")
-            await self._offer_link(team, user, channel, thread_ts)
+            await self._offer_link(team, user, channel, event.get("thread_ts"))
             return "link_expired"
 
         last = [0.0]
@@ -244,7 +248,7 @@ class Bridge:
                                 report, "Research report")
 
     # ------------------------------------------------------------------ links
-    async def _offer_link(self, team: str, user: str, channel: str, thread_ts: str) -> None:
+    async def _offer_link(self, team: str, user: str, channel: str, thread_ts: str | None) -> None:
         state, challenge = self.pending.create(team, user)
         url = self.cognito.authorize_url(state, challenge)
         await self.slack.post_ephemeral(
@@ -277,7 +281,7 @@ class Bridge:
             log.warning("link confirmation DM failed")
         return 200, f"Your hub account is linked{who}. You can close this tab and go back to Slack."
 
-    async def disconnect(self, team: str, user: str, channel: str, thread_ts: str) -> None:
+    async def disconnect(self, team: str, user: str, channel: str, thread_ts: str | None) -> None:
         """REQ-05."""
         link = await self.links.get(team, user)
         if link is not None:
